@@ -2,13 +2,14 @@ import sys
 import os
 import random
 from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow
-from PyQt6.QtGui import QPixmap, QTransform, QScreen
+from PyQt6.QtGui import QPixmap, QTransform
 from PyQt6.QtCore import Qt, QTimer, QPoint
 
 class FunSpider(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Window Setup
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
@@ -38,31 +39,33 @@ class FunSpider(QMainWindow):
         self.label.setPixmap(self.img_idle)
         self.resize(self.window_w, self.window_h)
 
-        # 3. BRAIN STATES
+        # 3. BRAIN & MOVEMENT
         self.state = "WALKING" 
         self.state_timer = 0    
+        self.is_dragging = False
+        self.walk_timer = 0
+        self.last_mouse_pos = QPoint()
 
-        # Initial position logic
+        # Initial Position (Primary Screen Floor)
         screen = QApplication.primaryScreen().geometry()
         self.move(100, screen.height() - self.window_h)
 
-        self.is_dragging = False
-        self.last_mouse_pos = QPoint()
+        # Heartbeat Timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_behavior)
         self.timer.start(30) 
-        self.walk_timer = 0
 
     def load_image(self, name):
-        path = os.path.join("assets", name)
+        # Compatibility for PyInstaller (Finding assets in EXE mode)
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(base_path, "assets", name)
         if os.path.exists(path):
             return QPixmap(path).scaledToHeight(self.scale_height, Qt.TransformationMode.SmoothTransformation)
         return QPixmap()
 
     def get_current_screen_geometry(self):
-        # This finds the monitor the spider is currently on
-        screen = self.screen().geometry()
-        return screen
+        # Finds the geometry of the monitor the spider is currently on
+        return self.screen().geometry()
 
     def get_flipped_pixmap(self, pixmap):
         if self.direction == -1:
@@ -73,13 +76,13 @@ class FunSpider(QMainWindow):
         if self.is_dragging:
             return 
 
-        # Update floor and screen info every tick based on current monitor
+        # Dynamic Monitor Check
         screen_geo = self.get_current_screen_geometry()
         floor_y = screen_geo.top() + screen_geo.height() - self.window_h
         
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        # Check if airborne relative to the current monitor
+        # Check if airborne (Physics state)
         if curr_y < floor_y or abs(self.vel_x) > 0.5:
             self.apply_physics(curr_x, curr_y, screen_geo, floor_y)
             return
@@ -88,22 +91,22 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         if self.state_timer <= 0:
             choice = random.random()
-            if choice < 0.6:
+            if choice < 0.6: # 60% Walk
                 self.state = "WALKING"
                 self.state_timer = random.randint(60, 200)
-            elif choice < 0.8:
+            elif choice < 0.8: # 20% Idle
                 self.state = "IDLE"
                 self.state_timer = random.randint(30, 100)
-            elif choice < 0.9:
+            elif choice < 0.9: # 10% Stare
                 self.state = "STARE"
                 self.state_timer = random.randint(60, 120)
-            else:
+            else: # 10% Sleep
                 self.state = "SLEEP"
                 self.state_timer = random.randint(200, 500)
 
-        # Execute States
+        # Execute Non-Physics States
         if self.state == "WALKING":
-            if random.random() < 0.01:
+            if random.random() < 0.01: # 1% chance to flip while walking
                 self.direction *= -1
             self.walk_logic(curr_x, screen_geo, floor_y)
         elif self.state == "IDLE":
@@ -120,7 +123,7 @@ class FunSpider(QMainWindow):
         current_pix = self.img_walk1 if self.walk_timer % 16 < 8 else self.img_walk2
         self.label.setPixmap(self.get_flipped_pixmap(current_pix))
 
-        # Stay within the horizontal bounds of the current monitor
+        # Edge Detection (Monitor specific)
         if new_x > screen_geo.left() + screen_geo.width() - self.window_w or new_x < screen_geo.left():
             self.direction *= -1
             new_x = curr_x
@@ -135,12 +138,12 @@ class FunSpider(QMainWindow):
         new_x = int(curr_x + self.vel_x)
         new_y = int(curr_y + self.vel_y)
 
-        # Bounce off the left/right walls of the current monitor
+        # Wall Bouncing (Monitor specific)
         if new_x < screen_geo.left() or new_x > screen_geo.left() + screen_geo.width() - self.window_w:
             self.vel_x *= -0.5 
             new_x = curr_x
 
-        # Land on the floor of the current monitor
+        # Floor Landing
         if new_y >= floor_y:
             new_y = floor_y
             self.vel_y = 0
@@ -164,6 +167,7 @@ class FunSpider(QMainWindow):
     def mouseMoveEvent(self, event):
         if self.is_dragging:
             now = event.globalPosition().toPoint()
+            # Calculate throw velocity
             self.vel_x = (now.x() - self.last_mouse_pos.x()) * 0.5
             self.vel_y = (now.y() - self.last_mouse_pos.y()) * 0.5
             self.last_mouse_pos = now
@@ -172,6 +176,7 @@ class FunSpider(QMainWindow):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
+            # Update walking direction based on horizontal velocity
             if self.vel_x > 0: self.direction = 1
             elif self.vel_x < 0: self.direction = -1
 
