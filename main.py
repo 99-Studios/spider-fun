@@ -11,13 +11,19 @@ class FunSpider(QMainWindow):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # 1. Settings
+    # 1. TUNED SETTINGS
         self.scale_height = 80  
-        self.window_size = 180  
-        self.speed = 8 
+        self.window_size = 200  # Bigger box = No more cutoff!
+        self.walk_speed = 5    # Slower, more natural walk
         self.direction = 1 
         
-        # 2. Load Images
+        self.gravity = 1.2      # Gentler gravity
+        self.friction = 0.92    # Friction (higher = slows down faster)
+        
+        self.vel_x = 0          
+        self.vel_y = 0          
+        
+    # 2. Load Images
         self.img_idle = self.load_image("idle.png")
         self.img_walk1 = self.load_image("walk_1.png")
         self.img_walk2 = self.load_image("walk_2.png")
@@ -25,31 +31,28 @@ class FunSpider(QMainWindow):
 
         self.label = QLabel(self)
         self.label.setFixedSize(self.window_size, self.window_size)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Use Bottom alignment for walking, Center for throwing
+        self.label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
         self.label.setPixmap(self.img_idle)
         self.resize(self.window_size, self.window_size)
 
-        # 3. FIX: CALCULATE TRUE BOTTOM
-        # 'screen().geometry()' includes the taskbar area
+    # 3. Position
         screen_geo = QApplication.primaryScreen().geometry()
-        
-        # We want the bottom of the spider's box to hit the bottom of the screen.
-        # If he still looks like he's "floating," decrease the '10' or '20' offset.
-        self.floor_y = screen_geo.height() - self.window_size + 30 # Added +30 to push him lower
-        
+        self.floor_y = screen_geo.height() - self.window_size
         self.move(100, self.floor_y)
 
+    # 4. Timer
         self.is_dragging = False
+        self.last_mouse_pos = QPoint()
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_behavior)
-        self.timer.start(100)
-        self.walk_frame = 0
+        self.timer.start(30) 
+        self.walk_timer = 0
 
     def load_image(self, name):
         path = os.path.join("assets", name)
         if os.path.exists(path):
-            pix = QPixmap(path)
-            return pix.scaledToHeight(self.scale_height, Qt.TransformationMode.SmoothTransformation)
+            return QPixmap(path).scaledToHeight(self.scale_height, Qt.TransformationMode.SmoothTransformation)
         return QPixmap()
 
     def get_flipped_pixmap(self, pixmap):
@@ -61,44 +64,86 @@ class FunSpider(QMainWindow):
         if self.is_dragging:
             return 
 
-        current_pos = self.pos()
-        new_x = current_pos.x() + (self.speed * self.direction)
+        curr_x, curr_y = self.pos().x(), self.pos().y()
+
+        # If airborne or moving fast, use physics
+        if curr_y < self.floor_y or abs(self.vel_x) > 0.5:
+            self.apply_physics(curr_x, curr_y)
+        else:
+            self.walk_logic(curr_x)
+
+    def walk_logic(self, curr_x):
+        self.vel_y = 0
+        self.vel_x = 0
+        
+        new_x = curr_x + (self.walk_speed * self.direction)
         screen_width = QApplication.primaryScreen().geometry().width()
         
-        # Animation logic
-        if self.walk_frame == 0:
+        # Slower animation cycle
+        self.walk_timer += 1
+        if self.walk_timer % 10 < 5:
             current_pix = self.img_walk1
-            self.walk_frame = 1
         else:
             current_pix = self.img_walk2
-            self.walk_frame = 0
             
         self.label.setPixmap(self.get_flipped_pixmap(current_pix))
 
-        # Boundary check
         if new_x > screen_width - self.window_size or new_x < 0:
             self.direction *= -1
         
-        # Re-apply floor_y every frame to ensure he stays stuck to the bottom
         self.move(new_x, self.floor_y)
+
+    def apply_physics(self, curr_x, curr_y):
+        self.label.setPixmap(self.get_flipped_pixmap(self.img_pickup))
+        self.vel_y += self.gravity
+        self.vel_x *= self.friction
+        
+        # CAP THE SPEED (So he doesn't teleport)
+        max_speed = 25
+        self.vel_x = max(-max_speed, min(max_speed, self.vel_x))
+        self.vel_y = max(-max_speed, min(max_speed, self.vel_y))
+
+        new_x = int(curr_x + self.vel_x)
+        new_y = int(curr_y + self.vel_y)
+
+        screen_width = QApplication.primaryScreen().geometry().width()
+        if new_x < 0 or new_x > screen_width - self.window_size:
+            self.vel_x *= -0.5 # Bounce back with less energy
+            new_x = curr_x
+
+        if new_y >= self.floor_y:
+            new_y = self.floor_y
+            self.vel_y = 0
+            # Stop sliding if speed is very low
+            if abs(self.vel_x) < 1: self.vel_x = 0 
+
+        self.move(new_x, new_y)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = True
+            self.label.setAlignment(Qt.AlignmentFlag.AlignCenter) 
             self.label.setPixmap(self.img_pickup)
             self.drag_offset = event.globalPosition().toPoint() - self.pos()
+            self.last_mouse_pos = event.globalPosition().toPoint()
         elif event.button() == Qt.MouseButton.RightButton:
             QApplication.quit()
 
     def mouseMoveEvent(self, event):
         if self.is_dragging:
-            self.move(event.globalPosition().toPoint() - self.drag_offset)
+            now = event.globalPosition().toPoint()
+            # Calculate speed of drag
+            self.vel_x = (now.x() - self.last_mouse_pos.x()) * 0.8
+            self.vel_y = (now.y() - self.last_mouse_pos.y()) * 0.8
+            self.last_mouse_pos = now
+            self.move(now - self.drag_offset)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
-            # When let go, he returns to the floor height
-            self.move(self.pos().x(), self.floor_y)
+            self.label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
+            if self.vel_x > 0: self.direction = 1
+            elif self.vel_x < 0: self.direction = -1
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
