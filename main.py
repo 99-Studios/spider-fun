@@ -11,14 +11,15 @@ class FunSpider(QMainWindow):
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-    # 1. TUNED SETTINGS
+    # 1. TUNED SETTINGS (Slower & Smaller Box)
         self.scale_height = 80  
-        self.window_size = 200  # Bigger box = No more cutoff!
-        self.walk_speed = 5    # Slower, more natural walk
+        self.window_size_h = 100  # Height of the window is now closer to spider height
+        self.window_size_w = 180  # Width of the window
+        self.walk_speed = 3       # Much slower walk
         self.direction = 1 
         
-        self.gravity = 1.2      # Gentler gravity
-        self.friction = 0.92    # Friction (higher = slows down faster)
+        self.gravity = 0.8        # Very gentle falling
+        self.friction = 0.90      # Slows down quickly after a throw
         
         self.vel_x = 0          
         self.vel_y = 0          
@@ -30,15 +31,15 @@ class FunSpider(QMainWindow):
         self.img_pickup = self.load_image("pickup.png")
 
         self.label = QLabel(self)
-        self.label.setFixedSize(self.window_size, self.window_size)
-        # Use Bottom alignment for walking, Center for throwing
-        self.label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
+        self.label.setFixedSize(self.window_size_w, self.window_size_h)
+        # Center the spider in this smaller box
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.label.setPixmap(self.img_idle)
-        self.resize(self.window_size, self.window_size)
+        self.resize(self.window_size_w, self.window_size_h)
 
-    # 3. Position
+    # 3. Position (Calculate floor based on new smaller height)
         screen_geo = QApplication.primaryScreen().geometry()
-        self.floor_y = screen_geo.height() - self.window_size
+        self.floor_y = screen_geo.height() - self.window_size_h
         self.move(100, self.floor_y)
 
     # 4. Timer
@@ -66,7 +67,6 @@ class FunSpider(QMainWindow):
 
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        # If airborne or moving fast, use physics
         if curr_y < self.floor_y or abs(self.vel_x) > 0.5:
             self.apply_physics(curr_x, curr_y)
         else:
@@ -79,16 +79,16 @@ class FunSpider(QMainWindow):
         new_x = curr_x + (self.walk_speed * self.direction)
         screen_width = QApplication.primaryScreen().geometry().width()
         
-        # Slower animation cycle
+        # Slow down animation cycle
         self.walk_timer += 1
-        if self.walk_timer % 10 < 5:
+        if self.walk_timer % 16 < 8: # Frame stays for 8 ticks
             current_pix = self.img_walk1
         else:
             current_pix = self.img_walk2
             
         self.label.setPixmap(self.get_flipped_pixmap(current_pix))
 
-        if new_x > screen_width - self.window_size or new_x < 0:
+        if new_x > screen_width - self.window_size_w or new_x < 0:
             self.direction *= -1
         
         self.move(new_x, self.floor_y)
@@ -98,8 +98,8 @@ class FunSpider(QMainWindow):
         self.vel_y += self.gravity
         self.vel_x *= self.friction
         
-        # CAP THE SPEED (So he doesn't teleport)
-        max_speed = 25
+        # Lowered max speed for safety
+        max_speed = 15
         self.vel_x = max(-max_speed, min(max_speed, self.vel_x))
         self.vel_y = max(-max_speed, min(max_speed, self.vel_y))
 
@@ -107,22 +107,21 @@ class FunSpider(QMainWindow):
         new_y = int(curr_y + self.vel_y)
 
         screen_width = QApplication.primaryScreen().geometry().width()
-        if new_x < 0 or new_x > screen_width - self.window_size:
-            self.vel_x *= -0.5 # Bounce back with less energy
+        if new_x < 0 or new_x > screen_width - self.window_size_w:
+            self.vel_x *= -0.5 
             new_x = curr_x
 
         if new_y >= self.floor_y:
             new_y = self.floor_y
             self.vel_y = 0
-            # Stop sliding if speed is very low
-            if abs(self.vel_x) < 1: self.vel_x = 0 
+            if abs(self.vel_x) < 0.5: self.vel_x = 0 
 
         self.move(new_x, new_y)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = True
-            self.label.setAlignment(Qt.AlignmentFlag.AlignCenter) 
+            # Re-center logic is cleaner with smaller window
             self.label.setPixmap(self.img_pickup)
             self.drag_offset = event.globalPosition().toPoint() - self.pos()
             self.last_mouse_pos = event.globalPosition().toPoint()
@@ -132,16 +131,15 @@ class FunSpider(QMainWindow):
     def mouseMoveEvent(self, event):
         if self.is_dragging:
             now = event.globalPosition().toPoint()
-            # Calculate speed of drag
-            self.vel_x = (now.x() - self.last_mouse_pos.x()) * 0.8
-            self.vel_y = (now.y() - self.last_mouse_pos.y()) * 0.8
+            # Gentler throw calculation
+            self.vel_x = (now.x() - self.last_mouse_pos.x()) * 0.5
+            self.vel_y = (now.y() - self.last_mouse_pos.y()) * 0.5
             self.last_mouse_pos = now
             self.move(now - self.drag_offset)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = False
-            self.label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
             if self.vel_x > 0: self.direction = 1
             elif self.vel_x < 0: self.direction = -1
 
