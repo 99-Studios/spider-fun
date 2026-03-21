@@ -1,6 +1,6 @@
 import sys
 import os
-import random # Added for decision making
+import random
 from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow
 from PyQt6.QtGui import QPixmap, QTransform
 from PyQt6.QtCore import Qt, QTimer, QPoint
@@ -29,7 +29,8 @@ class FunSpider(QMainWindow):
         self.img_walk1 = self.load_image("walk_1.png")
         self.img_walk2 = self.load_image("walk_2.png")
         self.img_pickup = self.load_image("pickup.png")
-        self.img_stare = self.load_image("stare.png") # Make sure this exists in assets!
+        self.img_stare = self.load_image("stare.png")
+        self.img_sleep = self.load_image("sleep.png") # Make sure this is in assets!
 
         self.label = QLabel(self)
         self.label.setFixedSize(self.window_w, self.window_h)
@@ -38,8 +39,8 @@ class FunSpider(QMainWindow):
         self.resize(self.window_w, self.window_h)
 
     # 3. BRAIN STATES
-        self.state = "WALKING" # Initial state
-        self.state_timer = 0    # How long to stay in a state
+        self.state = "WALKING" 
+        self.state_timer = 0    
 
         screen_geo = QApplication.primaryScreen().geometry()
         self.floor_y = screen_geo.height() - self.window_h
@@ -69,7 +70,6 @@ class FunSpider(QMainWindow):
 
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        # Physics check (If thrown/falling)
         if curr_y < self.floor_y or abs(self.vel_x) > 0.5:
             self.apply_physics(curr_x, curr_y)
             return
@@ -78,26 +78,33 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         
         if self.state_timer <= 0:
-            # Pick a new random state
-            # 70% chance to walk, 20% to idle, 10% to stare
+            # New Decision Time!
             choice = random.random()
-            if choice < 0.7:
+            if choice < 0.6: # 60% Walk
                 self.state = "WALKING"
-                self.state_timer = random.randint(50, 150) # Walk for 1.5 to 4.5 seconds
-            elif choice < 0.9:
+                self.state_timer = random.randint(60, 200)
+            elif choice < 0.8: # 20% Idle
                 self.state = "IDLE"
-                self.state_timer = random.randint(30, 80)
-            else:
+                self.state_timer = random.randint(30, 100)
+            elif choice < 0.9: # 10% Stare
                 self.state = "STARE"
-                self.state_timer = random.randint(40, 100)
+                self.state_timer = random.randint(60, 120)
+            else: # 10% Sleep
+                self.state = "SLEEP"
+                self.state_timer = random.randint(200, 500) # Sleeps longer
 
-        # Execute the current state
+        # Execute States
         if self.state == "WALKING":
+            # 1% chance every tick to flip direction while walking
+            if random.random() < 0.01:
+                self.direction *= -1
             self.walk_logic(curr_x)
         elif self.state == "IDLE":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
         elif self.state == "STARE":
-            self.label.setPixmap(self.img_stare) # He looks directly at you!
+            self.label.setPixmap(self.img_stare)
+        elif self.state == "SLEEP":
+            self.label.setPixmap(self.get_flipped_pixmap(self.img_sleep))
 
     def walk_logic(self, curr_x):
         new_x = curr_x + (self.walk_speed * self.direction)
@@ -134,13 +141,16 @@ class FunSpider(QMainWindow):
             self.vel_y = 0
             if abs(self.vel_x) < 0.5: 
                 self.vel_x = 0 
-                self.state = "IDLE" # Switch to idle after landing
+                # Wakes up if he hits the floor after a throw
+                self.state = "IDLE" 
+                self.state_timer = 20
 
         self.move(new_x, new_y)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.is_dragging = True
+            self.state = "IDLE" # Wake up if grabbed!
             self.label.setPixmap(self.img_pickup)
             self.drag_offset = event.globalPosition().toPoint() - self.pos()
             self.last_mouse_pos = event.globalPosition().toPoint()
