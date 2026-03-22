@@ -2,14 +2,14 @@ import sys
 import os
 import random
 from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow
-from PyQt6.QtGui import QPixmap, QTransform
+from PyQt6.QtGui import QPixmap, QTransform, QCursor # Add QCursor here
 from PyQt6.QtCore import Qt, QTimer, QPoint
 
 class FunSpider(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.version = "1.0.1"
+        self.version = "1.1.0"
 
         # Window Setup
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
@@ -75,16 +75,12 @@ class FunSpider(QMainWindow):
         return pixmap
 
     def update_behavior(self):
-        if self.is_dragging:
-            return 
+        if self.is_dragging: return 
 
-        # Dynamic Monitor Check
         screen_geo = self.get_current_screen_geometry()
         floor_y = screen_geo.top() + screen_geo.height() - self.window_h
-        
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        # Check if airborne (Physics state)
         if curr_y < floor_y or abs(self.vel_x) > 0.5:
             self.apply_physics(curr_x, curr_y, screen_geo, floor_y)
             return
@@ -93,24 +89,43 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         if self.state_timer <= 0:
             choice = random.random()
-            if choice < 0.6: # 60% Walk
+            if choice < 0.5:
                 self.state = "WALKING"
                 self.state_timer = random.randint(60, 200)
-            elif choice < 0.8: # 20% Idle
+            elif choice < 0.65:
                 self.state = "IDLE"
                 self.state_timer = random.randint(30, 100)
-            elif choice < 0.9: # 10% Stare
+            elif choice < 0.8:
                 self.state = "STARE"
                 self.state_timer = random.randint(60, 120)
-            else: # 10% Sleep
+            elif choice < 0.9:
                 self.state = "SLEEP"
                 self.state_timer = random.randint(200, 500)
+            else:
+                # 10% chance to start FOLLOWING the mouse
+                self.state = "FOLLOWING"
+                self.state_timer = random.randint(100, 250)
 
-        # Execute Non-Physics States
-        if self.state == "WALKING":
-            if random.random() < 0.01: # 1% chance to flip while walking
-                self.direction *= -1
+        # Execute States
+        if self.state == "FOLLOWING":
+            # 1. Find the mouse using QCursor (much more stable)
+            mouse_pos = QCursor.pos()
+            mouse_x = mouse_pos.x()
+            
+            # 2. Determine direction
+            spider_center_x = curr_x + (self.window_w // 2)
+            
+            if abs(mouse_x - spider_center_x) > 20:
+                self.direction = 1 if mouse_x > spider_center_x else -1
+                self.walk_logic(curr_x, screen_geo, floor_y)
+            else:
+                # He's close enough!
+                self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
+
+        elif self.state == "WALKING":
+            if random.random() < 0.01: self.direction *= -1
             self.walk_logic(curr_x, screen_geo, floor_y)
+        # ... rest of your idle/stare/sleep states ...
         elif self.state == "IDLE":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
         elif self.state == "STARE":
