@@ -2,14 +2,14 @@ import sys
 import os
 import random
 from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow
-from PyQt6.QtGui import QPixmap, QTransform
+from PyQt6.QtGui import QPixmap, QTransform, QCursor # Add QCursor here
 from PyQt6.QtCore import Qt, QTimer, QPoint
 
 class FunSpider(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.version = "1.0.1"
+        self.version = "1.1.0"
 
         # Window Setup
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
@@ -34,6 +34,7 @@ class FunSpider(QMainWindow):
         self.img_pickup = self.load_image("pickup.png")
         self.img_stare = self.load_image("stare.png")
         self.img_sleep = self.load_image("sleep.png")
+        self.img_read = self.load_image("read.png")
 
         self.label = QLabel(self)
         self.label.setFixedSize(self.window_w, self.window_h)
@@ -75,16 +76,12 @@ class FunSpider(QMainWindow):
         return pixmap
 
     def update_behavior(self):
-        if self.is_dragging:
-            return 
+        if self.is_dragging: return 
 
-        # Dynamic Monitor Check
         screen_geo = self.get_current_screen_geometry()
         floor_y = screen_geo.top() + screen_geo.height() - self.window_h
-        
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        # Check if airborne (Physics state)
         if curr_y < floor_y or abs(self.vel_x) > 0.5:
             self.apply_physics(curr_x, curr_y, screen_geo, floor_y)
             return
@@ -93,24 +90,52 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         if self.state_timer <= 0:
             choice = random.random()
-            if choice < 0.6: # 60% Walk
+            if choice < 0.4: # 40% Walk
                 self.state = "WALKING"
                 self.state_timer = random.randint(60, 200)
-            elif choice < 0.8: # 20% Idle
+            elif choice < 0.55: # 15% Idle
                 self.state = "IDLE"
                 self.state_timer = random.randint(30, 100)
-            elif choice < 0.9: # 10% Stare
+            elif choice < 0.7: # 15% Stare
                 self.state = "STARE"
                 self.state_timer = random.randint(60, 120)
-            else: # 10% Sleep
+            elif choice < 0.8: # 10% Sleep
                 self.state = "SLEEP"
                 self.state_timer = random.randint(200, 500)
+            elif choice < 0.9: # 10% Follow Mouse
+                self.state = "FOLLOWING"
+                self.state_timer = random.randint(100, 250)
+            else: # 10% Reading
+                self.state = "READING"
+                self.state_timer = random.randint(150, 300)
 
-        # Execute Non-Physics States
-        if self.state == "WALKING":
-            if random.random() < 0.01: # 1% chance to flip while walking
-                self.direction *= -1
+        # Execute States
+        if self.state == "READING":
+            self.label.setPixmap(self.get_flipped_pixmap(self.img_read))
+            # Optional: Tiny 1-pixel jitters to look like he's scanning lines
+            if random.random() < 0.1:
+                offset = random.choice([-1, 0, 1])
+                self.move(curr_x + offset, curr_y)
+
+        elif self.state == "FOLLOWING":
+            # 1. Find the mouse using QCursor (much more stable)
+            mouse_pos = QCursor.pos()
+            mouse_x = mouse_pos.x()
+            
+            # 2. Determine direction
+            spider_center_x = curr_x + (self.window_w // 2)
+            
+            if abs(mouse_x - spider_center_x) > 20:
+                self.direction = 1 if mouse_x > spider_center_x else -1
+                self.walk_logic(curr_x, screen_geo, floor_y)
+            else:
+                # He's close enough!
+                self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
+
+        elif self.state == "WALKING":
+            if random.random() < 0.01: self.direction *= -1
             self.walk_logic(curr_x, screen_geo, floor_y)
+        # ... rest of idle/stare/sleep states ...
         elif self.state == "IDLE":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
         elif self.state == "STARE":
