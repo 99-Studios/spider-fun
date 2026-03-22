@@ -5,6 +5,8 @@
 
 FUN Spider is a curious, 8-legged spider that roams around your desktop. He walks, sleeps, stares, and can even be tossed around across multiple monitors!
 
+![Spider Preview](assets/stare.png)
+
 ## Features
 **Curiousity:** He will randomly decide to walk, stare, stand, or just take a nap.
 **Physics Engine:** Features gravity, frictions, and momentum.
