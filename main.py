@@ -125,7 +125,7 @@ class FunSpider(QMainWindow):
         elif self.state == "WALKING":
             if random.random() < 0.01: self.direction *= -1
             self.walk_logic(curr_x, screen_geo, floor_y)
-        # ... rest of your idle/stare/sleep states ...
+        # ... rest of idle/stare/sleep states ...
         elif self.state == "IDLE":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
         elif self.state == "STARE":
