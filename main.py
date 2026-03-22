@@ -9,7 +9,7 @@ class FunSpider(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.version = "1.1.0"
+        self.version = "1.2.0"
 
         # Window Setup
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
@@ -19,10 +19,10 @@ class FunSpider(QMainWindow):
         self.scale_height = 80  
         self.window_w = 180 
         self.window_h = 100
-        self.walk_speed = 3
+        self.walk_speed = 1.5
         self.direction = 1 
         
-        self.gravity = 0.8
+        self.gravity = 0.4
         self.friction = 0.90
         self.vel_x = 0          
         self.vel_y = 0          
@@ -56,7 +56,7 @@ class FunSpider(QMainWindow):
         # Heartbeat Timer
         self.timer = QTimer()
         self.timer.timeout.connect(self.update_behavior)
-        self.timer.start(30) 
+        self.timer.start(16) 
 
     def load_image(self, name):
         # Compatibility for PyInstaller (Finding assets in EXE mode)
@@ -90,6 +90,12 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         if self.state_timer <= 0:
             choice = random.random()
+
+            if choice < 0.1: # 10% Chance to Hop
+                self.state = "JUMPING"
+                self.vel_y = -12 # Negative moves UP. -12 is a nice medium hop.
+                self.vel_x = random.uniform(-4, 4) # Small horizontal toss
+                self.state_timer = 20 # Short timer to reset
             if choice < 0.4: # 40% Walk
                 self.state = "WALKING"
                 self.state_timer = random.randint(60, 200)
