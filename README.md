@@ -8,10 +8,10 @@ FUN Spider is a curious, 8-legged spider that roams around your desktop. He walk
 ![Spider Preview](assets/stare.png)
 
 ## Features
-**Curiousity:** He will randomly decide to walk, stare, stand, or just take a nap.
-**Physics Engine:** Features gravity, frictions, and momentum.
-**Drag and Toss:** Pick him up and move him. Release him while moving your mouse to throw him across the screen.
-**Right-Click to Exit:** A simple way to say goodbye.
+* **Curiousity:** He will randomly decide to walk, stare, stand, or just take a nap.
+* **Physics Engine:** Features gravity, frictions, and momentum.
+* **Drag and Toss:** Pick him up and move him. Release him while moving your mouse to throw him across the screen.
+* **Right-Click to Exit:** A simple way to say goodbye.
 
 ## How to Run
 
