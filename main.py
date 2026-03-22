@@ -19,7 +19,7 @@ class FunSpider(QMainWindow):
         self.scale_height = 80  
         self.window_w = 180 
         self.window_h = 100
-        self.walk_speed = 1.5
+        self.walk_speed = 1
         self.direction = 1 
         
         self.gravity = 0.4
@@ -82,7 +82,8 @@ class FunSpider(QMainWindow):
         floor_y = screen_geo.top() + screen_geo.height() - self.window_h
         curr_x, curr_y = self.pos().x(), self.pos().y()
 
-        if curr_y < floor_y or abs(self.vel_x) > 0.5:
+        # PHYSICS CHECK (Handles Jumping and Falling)
+        if curr_y < floor_y or abs(self.vel_x) > 0.1:
             self.apply_physics(curr_x, curr_y, screen_geo, floor_y)
             return
 
@@ -91,76 +92,62 @@ class FunSpider(QMainWindow):
         if self.state_timer <= 0:
             choice = random.random()
 
-            if choice < 0.1: # 10% Chance to Hop
+            if choice < 0.15: # 15% Chance to JUMP (Highest Active Priority)
                 self.state = "JUMPING"
-                self.vel_y = -12 # Negative moves UP. -12 is a nice medium hop.
-                self.vel_x = random.uniform(-4, 4) # Small horizontal toss
-                self.state_timer = 20 # Short timer to reset
-            if choice < 0.4: # 40% Walk
-                self.state = "WALKING"
-                self.state_timer = random.randint(60, 200)
-            elif choice < 0.55: # 15% Idle
-                self.state = "IDLE"
-                self.state_timer = random.randint(30, 100)
-            elif choice < 0.7: # 15% Stare
-                self.state = "STARE"
-                self.state_timer = random.randint(60, 120)
-            elif choice < 0.8: # 10% Sleep
-                self.state = "SLEEP"
-                self.state_timer = random.randint(200, 500)
-            elif choice < 0.9: # 10% Follow Mouse
+                self.vel_y = random.uniform(-14, -25)
+                self.vel_x = random.uniform(-5, 5)
+                self.state_timer = 30 # Small reset timer
+
+            elif choice < 0.23: # 8% Chance to FOLLOW (0.23 - 0.15 = 0.08)
                 self.state = "FOLLOWING"
-                self.state_timer = random.randint(100, 250)
-            else: # 10% Reading
+                self.state_timer = random.randint(150, 400)
+
+            elif choice < 0.50: # 27% Chance to WALK
+                self.state = "WALKING"
+                self.state_timer = random.randint(100, 300)
+
+            elif choice < 0.65: # 15% Chance to READ
                 self.state = "READING"
-                self.state_timer = random.randint(150, 300)
+                self.state_timer = random.randint(200, 400)
+
+            elif choice < 0.85: # 20% Chance to IDLE
+                self.state = "IDLE"
+                self.state_timer = random.randint(60, 150)
+
+            else: # 15% Chance to SLEEP
+                self.state = "SLEEP"
+                self.state_timer = random.randint(400, 1000)
 
         # Execute States
-        if self.state == "READING":
+        if self.state == "JUMPING":
+            # While in the air, use idle or pickup sprite
+            self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
+        elif self.state == "READING":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_read))
-            # Optional: Tiny 1-pixel jitters to look like he's scanning lines
-            if random.random() < 0.1:
-                offset = random.choice([-1, 0, 1])
-                self.move(curr_x + offset, curr_y)
-
         elif self.state == "FOLLOWING":
-            # 1. Find the mouse using QCursor (much more stable)
-            mouse_pos = QCursor.pos()
-            mouse_x = mouse_pos.x()
-            
-            # 2. Determine direction
+            mouse_x = QCursor.pos().x()
             spider_center_x = curr_x + (self.window_w // 2)
-            
             if abs(mouse_x - spider_center_x) > 20:
                 self.direction = 1 if mouse_x > spider_center_x else -1
                 self.walk_logic(curr_x, screen_geo, floor_y)
-            else:
-                # He's close enough!
-                self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
-
         elif self.state == "WALKING":
             if random.random() < 0.01: self.direction *= -1
             self.walk_logic(curr_x, screen_geo, floor_y)
-        # ... rest of idle/stare/sleep states ...
         elif self.state == "IDLE":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_idle))
-        elif self.state == "STARE":
-            self.label.setPixmap(self.img_stare)
         elif self.state == "SLEEP":
             self.label.setPixmap(self.get_flipped_pixmap(self.img_sleep))
 
     def walk_logic(self, curr_x, screen_geo, floor_y):
         new_x = curr_x + (self.walk_speed * self.direction)
-        
         self.walk_timer += 1
-        current_pix = self.img_walk1 if self.walk_timer % 16 < 8 else self.img_walk2
+        # Slowed down animation frame rate to match 60fps (change 16 to 32)
+        current_pix = self.img_walk1 if self.walk_timer % 32 < 16 else self.img_walk2
         self.label.setPixmap(self.get_flipped_pixmap(current_pix))
-
-        # Edge Detection (Monitor specific)
+        
         if new_x > screen_geo.left() + screen_geo.width() - self.window_w or new_x < screen_geo.left():
             self.direction *= -1
             new_x = curr_x
-        
         self.move(new_x, floor_y)
 
     def apply_physics(self, curr_x, curr_y, screen_geo, floor_y):
