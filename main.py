@@ -9,6 +9,8 @@ class FunSpider(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.version = "1.0.1"
+
         # Window Setup
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint | Qt.WindowType.Tool)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
