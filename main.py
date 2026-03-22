@@ -34,6 +34,7 @@ class FunSpider(QMainWindow):
         self.img_pickup = self.load_image("pickup.png")
         self.img_stare = self.load_image("stare.png")
         self.img_sleep = self.load_image("sleep.png")
+        self.img_read = self.load_image("read.png")
 
         self.label = QLabel(self)
         self.label.setFixedSize(self.window_w, self.window_h)
@@ -89,25 +90,34 @@ class FunSpider(QMainWindow):
         self.state_timer -= 1
         if self.state_timer <= 0:
             choice = random.random()
-            if choice < 0.5:
+            if choice < 0.4: # 40% Walk
                 self.state = "WALKING"
                 self.state_timer = random.randint(60, 200)
-            elif choice < 0.65:
+            elif choice < 0.55: # 15% Idle
                 self.state = "IDLE"
                 self.state_timer = random.randint(30, 100)
-            elif choice < 0.8:
+            elif choice < 0.7: # 15% Stare
                 self.state = "STARE"
                 self.state_timer = random.randint(60, 120)
-            elif choice < 0.9:
+            elif choice < 0.8: # 10% Sleep
                 self.state = "SLEEP"
                 self.state_timer = random.randint(200, 500)
-            else:
-                # 10% chance to start FOLLOWING the mouse
+            elif choice < 0.9: # 10% Follow Mouse
                 self.state = "FOLLOWING"
                 self.state_timer = random.randint(100, 250)
+            else: # 10% Reading
+                self.state = "READING"
+                self.state_timer = random.randint(150, 300)
 
         # Execute States
-        if self.state == "FOLLOWING":
+        if self.state == "READING":
+            self.label.setPixmap(self.get_flipped_pixmap(self.img_read))
+            # Optional: Tiny 1-pixel jitters to look like he's scanning lines
+            if random.random() < 0.1:
+                offset = random.choice([-1, 0, 1])
+                self.move(curr_x + offset, curr_y)
+
+        elif self.state == "FOLLOWING":
             # 1. Find the mouse using QCursor (much more stable)
             mouse_pos = QCursor.pos()
             mouse_x = mouse_pos.x()
